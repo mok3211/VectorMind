@@ -29,7 +29,12 @@ docker compose up -d
 uv sync
 ```
 
-4. 启动服务：
+4. 初始化/升级数据库（Alembic）：
+```bash
+uv run alembic upgrade head
+```
+
+5. 启动服务：
 ```bash
 uv run uvicorn server.main:app --reload
 ```
@@ -66,8 +71,15 @@ curl -X POST http://127.0.0.1:8000/auth/bootstrap \
   - 官方 API（若可用）；
   - 或 Playwright 自动化“辅助发布”（不建议爬虫/逆向，避免账号风险）。
 
-## 数据库迁移提示
+## 数据库迁移（Alembic）
 
-当前开发阶段默认使用 `SQLModel.metadata.create_all` 自动建表。**如果你新增了字段/表结构**：
-- 开发环境可直接删库/删表重建；
-- 需要正式迁移时，已预留 `alembic` 依赖（后续我可以帮你补全迁移脚手架与版本管理）。
+本项目使用 **Alembic** 管理表结构（不再自动 create_all）。
+
+常用命令：
+```bash
+# 生成迁移（推荐：修改 models 后执行）
+uv run alembic revision --autogenerate -m "your message"
+
+# 应用迁移
+uv run alembic upgrade head
+```

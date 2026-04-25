@@ -4,8 +4,6 @@ from contextlib import asynccontextmanager
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
-from sqlmodel import SQLModel
-
 from server.config import settings
 
 
@@ -21,12 +19,16 @@ AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=F
 
 
 async def init_db() -> None:
-    async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+    """
+    仅做连通性检查。
+
+    表结构由 Alembic 管理（推荐在启动服务前执行：`alembic upgrade head`）。
+    """
+    async with engine.begin():
+        return
 
 
 @asynccontextmanager
 async def get_session():
     async with AsyncSessionLocal() as session:
         yield session
-
