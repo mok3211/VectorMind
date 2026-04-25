@@ -1,0 +1,38 @@
+[project]
+name = "ai-workflows"
+version = "0.1.0"
+description = "AI 创意工作流：早安电台 / 书单推荐 / 旅游规划 / 早安历史（deeplegacy）"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.30.0",
+  "pydantic-settings>=2.6.0",
+  "python-dotenv>=1.0.1",
+  "jinja2>=3.1.4",
+  "litellm>=1.52.0",
+  "httpx[socks]>=0.27.2",
+  "sqlmodel>=0.0.22",
+  "sqlalchemy>=2.0.35",
+  "asyncpg>=0.29.0",
+  "python-jose[cryptography]>=3.3.0",
+  "passlib[bcrypt]>=1.7.4",
+  "email-validator>=2.2.0",
+  "python-multipart>=0.0.9",
+  "google-genai>=1.73.1",
+]
+
+[tool.uv]
+dev-dependencies = [
+  "ruff>=0.6.9",
+  "pytest>=8.3.3",
+  "pytest-asyncio>=0.24.0",
+  "alembic>=1.13.3",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
