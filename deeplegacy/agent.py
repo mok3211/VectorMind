@@ -37,7 +37,7 @@ class MorningHistoryAgent:
             vars={"word_count": 520, "today": today},
         )
 
-        text = await skill_registry.get("llm_generate").run(
+        text = await skill_registry.get("langchain_generate").run(
             ctx,
             messages=prompt_pack.messages,
             temperature=0.6,

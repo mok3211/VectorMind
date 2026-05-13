@@ -4,9 +4,9 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlmodel import select
 
-from server.auth.deps import require_admin
+from server.auth.deps import require_permission
 from server.db import get_session
 from server.models import MediaAccount
 
@@ -22,7 +22,7 @@ class MediaAccountCreate(BaseModel):
 
 
 @router.get("")
-async def list_accounts(_: object = Depends(require_admin), session=Depends(get_session)):
+async def list_accounts(_: object = Depends(require_permission("media.view")), session=Depends(get_session)):
     res = await session.exec(select(MediaAccount).order_by(MediaAccount.updated_at.desc()))
     items = res.all()
     return {"items": [i.model_dump() for i in items]}
@@ -30,7 +30,7 @@ async def list_accounts(_: object = Depends(require_admin), session=Depends(get_
 
 @router.post("")
 async def create_account(
-    req: MediaAccountCreate, _: object = Depends(require_admin), session=Depends(get_session)
+    req: MediaAccountCreate, _: object = Depends(require_permission("media.manage")), session=Depends(get_session)
 ):
     item = MediaAccount(
         platform=req.platform,
@@ -55,7 +55,7 @@ class MediaAccountUpdate(BaseModel):
 
 @router.put("/{account_id}")
 async def update_account(
-    account_id: int, req: MediaAccountUpdate, _: object = Depends(require_admin), session=Depends(get_session)
+    account_id: int, req: MediaAccountUpdate, _: object = Depends(require_permission("media.manage")), session=Depends(get_session)
 ):
     item = await session.get(MediaAccount, account_id)
     if not item:
@@ -78,11 +78,10 @@ async def update_account(
 
 
 @router.delete("/{account_id}")
-async def delete_account(account_id: int, _: object = Depends(require_admin), session=Depends(get_session)):
+async def delete_account(account_id: int, _: object = Depends(require_permission("media.manage")), session=Depends(get_session)):
     item = await session.get(MediaAccount, account_id)
     if not item:
         return {"ok": True}
     await session.delete(item)
     await session.commit()
     return {"ok": True}
-

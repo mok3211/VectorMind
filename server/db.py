@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
-
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.orm import sessionmaker
+from sqlmodel.ext.asyncio.session import AsyncSession
 from server.config import settings
 
 
 def get_engine() -> AsyncEngine:
-    if not getattr(settings, "database_url", None):
-        raise RuntimeError("DATABASE_URL 未设置，请在 .env 中配置 PostgreSQL 连接串。")
-    return create_async_engine(settings.database_url, echo=False, pool_pre_ping=True)
+    url = getattr(settings, "database_url", None)
+    if not url:
+        url = "sqlite+aiosqlite:///./dev.db"
+    return create_async_engine(url, echo=False, pool_pre_ping=True)
 
 
 engine = get_engine()
@@ -28,7 +28,6 @@ async def init_db() -> None:
         return
 
 
-@asynccontextmanager
 async def get_session():
     async with AsyncSessionLocal() as session:
         yield session

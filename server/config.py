@@ -20,8 +20,11 @@ class Settings(BaseSettings):
     # CORS
     cors_origins: str = "http://127.0.0.1:5173"
 
-    # 默认模型（LiteLLM model string）
-    llm_model_default: str = "gpt-4o-mini"
+    # NVIDIA API（LangChain ChatNVIDIA）
+    nvidia_api_key: str | None = None
+
+    # 默认模型（NVIDIA NIM model string）
+    llm_model_default: str = "meta/llama-3.1-70b-instruct"
 
     # agent 覆盖模型（可选）
     morning_radio_model: str | None = None
@@ -34,6 +37,24 @@ class Settings(BaseSettings):
     book_recommendation_prompt_version: str = "v1"
     travel_planner_prompt_version: str = "v1"
     morning_history_prompt_version: str = "v1"
+
+    # 新媒体自动化发布
+    media_profile_root: str = ".media_profiles"
+
+    # 启动时自动创建内置管理员（仅当 users 表为空）
+    bootstrap_admin_enabled: bool = True
+    bootstrap_admin_identifier: str = "zhangchi"
+    bootstrap_admin_password: str = "zhangchi2026"
+    # 若为 true：启动时会强制重置内置管理员密码（仅用于开发环境）
+    # 为了避免“库里已有旧账号/旧 hash 导致一直登录失败”，这里默认开启。
+    bootstrap_admin_force_reset: bool = True
+
+    # Marketing crawler mode: playwright / mock（不建议）
+    marketing_crawler_mode: str = "playwright"
+
+    # Playwright 运行参数（真实抓取）
+    marketing_playwright_headless: bool = True
+    marketing_playwright_slow_mo_ms: int = 0
 
 
 settings = Settings()

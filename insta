@@ -1,0 +1,206 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RUN_DIR="${ROOT_DIR}/.run"
+LOG_DIR="${ROOT_DIR}/logs"
+
+API_PID="${RUN_DIR}/api.pid"
+ADMIN_PID="${RUN_DIR}/admin.pid"
+AGENT_PID="${RUN_DIR}/agent.pid"
+
+mkdir -p "${RUN_DIR}" "${LOG_DIR}"
+
+usage() {
+  cat <<'EOF'
+用法：
+  ./insta install            安装后端+前端依赖（含 playwright 浏览器）
+  ./insta start [api|admin|agent|all]
+  ./insta stop  [api|admin|agent|all]
+  ./insta restart [api|admin|agent|all]
+  ./insta status [api|admin|agent|all]
+
+说明：
+  - api 默认端口：8000
+  - admin 默认端口：5173
+  - agent 默认端口：18765（需要提前在 Server 端创建 executor 并配置 token）
+EOF
+}
+
+is_running() {
+  local pid_file="$1"
+  [[ -f "${pid_file}" ]] || return 1
+  local pid
+  pid="$(cat "${pid_file}" 2>/dev/null || true)"
+  [[ -n "${pid}" ]] || return 1
+  kill -0 "${pid}" 2>/dev/null
+}
+
+start_api() {
+  if is_running "${API_PID}"; then
+    echo "[api] already running: pid=$(cat "${API_PID}")"
+    return 0
+  fi
+  echo "[api] migrating DB..."
+  (cd "${ROOT_DIR}" && uv run alembic upgrade head) >> "${LOG_DIR}/api.log" 2>&1 || true
+  echo "[api] starting on :8000"
+  nohup bash -lc "cd \"${ROOT_DIR}\" && uv run uvicorn server.main:app --host 0.0.0.0 --port 8000" \
+    >> "${LOG_DIR}/api.log" 2>&1 &
+  echo $! > "${API_PID}"
+  echo "[api] started: pid=$(cat "${API_PID}") (log: logs/api.log)"
+}
+
+stop_api() {
+  if ! [[ -f "${API_PID}" ]]; then
+    echo "[api] not running"
+    return 0
+  fi
+  local pid
+  pid="$(cat "${API_PID}" 2>/dev/null || true)"
+  if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
+    echo "[api] stopping pid=${pid}"
+    kill "${pid}" 2>/dev/null || true
+  fi
+  rm -f "${API_PID}"
+}
+
+start_admin() {
+  if is_running "${ADMIN_PID}"; then
+    echo "[admin] already running: pid=$(cat "${ADMIN_PID}")"
+    return 0
+  fi
+  echo "[admin] starting on :5173"
+  nohup bash -lc "cd \"${ROOT_DIR}/admin\" && pnpm dev --host 0.0.0.0 --port 5173" \
+    >> "${LOG_DIR}/admin.log" 2>&1 &
+  echo $! > "${ADMIN_PID}"
+  echo "[admin] started: pid=$(cat "${ADMIN_PID}") (log: logs/admin.log)"
+}
+
+stop_admin() {
+  if ! [[ -f "${ADMIN_PID}" ]]; then
+    echo "[admin] not running"
+    return 0
+  fi
+  local pid
+  pid="$(cat "${ADMIN_PID}" 2>/dev/null || true)"
+  if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
+    echo "[admin] stopping pid=${pid}"
+    kill "${pid}" 2>/dev/null || true
+  fi
+  rm -f "${ADMIN_PID}"
+}
+
+start_agent() {
+  if is_running "${AGENT_PID}"; then
+    echo "[agent] already running: pid=$(cat "${AGENT_PID}")"
+    return 0
+  fi
+  # 依赖环境变量：AGENT_EXECUTOR_TOKEN / AGENT_SERVER_BASE_URL 等
+  if [[ -z "${AGENT_EXECUTOR_TOKEN:-}" ]]; then
+    echo "[agent] 缺少环境变量 AGENT_EXECUTOR_TOKEN（先在 Server 端 /api/executors 创建并复制 token）"
+    exit 1
+  fi
+  echo "[agent] starting on 127.0.0.1:18765"
+  nohup bash -lc "cd \"${ROOT_DIR}\" && uv run uvicorn local_agent.main:app --host 127.0.0.1 --port 18765" \
+    >> "${LOG_DIR}/agent.log" 2>&1 &
+  echo $! > "${AGENT_PID}"
+  echo "[agent] started: pid=$(cat "${AGENT_PID}") (log: logs/agent.log)"
+}
+
+stop_agent() {
+  if ! [[ -f "${AGENT_PID}" ]]; then
+    echo "[agent] not running"
+    return 0
+  fi
+  local pid
+  pid="$(cat "${AGENT_PID}" 2>/dev/null || true)"
+  if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
+    echo "[agent] stopping pid=${pid}"
+    kill "${pid}" 2>/dev/null || true
+  fi
+  rm -f "${AGENT_PID}"
+}
+
+status_one() {
+  local name="$1"
+  local pid_file="$2"
+  if is_running "${pid_file}"; then
+    echo "[${name}] running pid=$(cat "${pid_file}")"
+  else
+    echo "[${name}] stopped"
+  fi
+}
+
+install_all() {
+  echo "[install] backend deps via uv..."
+  (cd "${ROOT_DIR}" && uv sync) || (cd "${ROOT_DIR}" && uv pip install -r <(uv pip compile pyproject.toml) --break-system-packages)
+
+  echo "[install] playwright browsers..."
+  (cd "${ROOT_DIR}" && uv run playwright install chromium)
+
+  echo "[install] admin deps via pnpm..."
+  if command -v corepack >/dev/null 2>&1; then
+    corepack enable || true
+    corepack prepare pnpm@10 --activate || true
+  fi
+  (cd "${ROOT_DIR}/admin" && pnpm install)
+
+  echo "[install] done."
+}
+
+cmd="${1:-}"
+target="${2:-all}"
+
+case "${cmd}" in
+  install)
+    install_all
+    ;;
+  start)
+    case "${target}" in
+      api) start_api ;;
+      admin) start_admin ;;
+      agent) start_agent ;;
+      all|"") start_api; start_admin ;;
+      *) usage; exit 1 ;;
+    esac
+    ;;
+  stop)
+    case "${target}" in
+      api) stop_api ;;
+      admin) stop_admin ;;
+      agent) stop_agent ;;
+      all|"") stop_agent; stop_admin; stop_api ;;
+      *) usage; exit 1 ;;
+    esac
+    ;;
+  restart)
+    case "${target}" in
+      api) stop_api; start_api ;;
+      admin) stop_admin; start_admin ;;
+      agent) stop_agent; start_agent ;;
+      all|"") stop_agent; stop_admin; stop_api; start_api; start_admin ;;
+      *) usage; exit 1 ;;
+    esac
+    ;;
+  status)
+    case "${target}" in
+      api) status_one "api" "${API_PID}" ;;
+      admin) status_one "admin" "${ADMIN_PID}" ;;
+      agent) status_one "agent" "${AGENT_PID}" ;;
+      all|"")
+        status_one "api" "${API_PID}"
+        status_one "admin" "${ADMIN_PID}"
+        status_one "agent" "${AGENT_PID}"
+        ;;
+      *) usage; exit 1 ;;
+    esac
+    ;;
+  ""|help|-h|--help)
+    usage
+    ;;
+  *)
+    usage
+    exit 1
+    ;;
+esac
+

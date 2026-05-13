@@ -31,7 +31,7 @@ class MorningRadioAgent:
             vars={"word_count": 250, "topic": topic, "audience": audience},
         )
 
-        text = await skill_registry.get("llm_generate").run(
+        text = await skill_registry.get("langchain_generate").run(
             ctx,
             messages=prompt_pack.messages,
             temperature=0.8,

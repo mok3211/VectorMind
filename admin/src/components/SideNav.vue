@@ -1,22 +1,35 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NButton, NDivider, NText } from 'naive-ui'
 import { useAuthStore } from '@/stores/auth'
+import { api } from '@/lib/api'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 
-const items = [
-  { key: '/', label: '概览', icon: '◎' },
-  { key: '/agents', label: 'Agent 运行', icon: '◈' },
-  { key: '/workflows', label: '工作流', icon: '⟠' },
-  { key: '/runs', label: '生成记录', icon: '↻' },
-  { key: '/media', label: '媒体账号', icon: '⌁' }
-]
+const items = ref<{ key: string; label: string; icon?: string }[]>([
+  { key: '/', label: '概览', icon: '◎' }
+])
 
-const active = computed(() => items.find((i) => route.path === i.key)?.key ?? '/')
+onMounted(async () => {
+  try {
+    const { data } = await api.get('/api/rbac/my-menus')
+    const list = (data.items ?? []).map((m: any) => ({
+      key: m.path,
+      label: m.label,
+      icon: m.icon || '•'
+    }))
+    // 确保有首页
+    if (!list.find((x: any) => x.key === '/')) list.unshift({ key: '/', label: '概览', icon: '◎' })
+    items.value = list
+  } catch {
+    // fallback: 保留最小菜单
+  }
+})
+
+const active = computed(() => items.value.find((i) => route.path === i.key)?.key ?? '/')
 
 function go(path: string) {
   router.push(path)

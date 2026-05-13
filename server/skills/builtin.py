@@ -29,8 +29,8 @@ class PromptRenderSkill:
         return PromptPack(system=system, user=user, messages=messages)
 
 
-class LLMGenerateSkill:
-    name = "llm_generate"
+class LangChainGenerateSkill:
+    name = "langchain_generate"
 
     async def run(
         self,
@@ -42,8 +42,9 @@ class LLMGenerateSkill:
         extra: dict[str, Any] | None = None,
     ) -> str:
         ctx.log_step(
-            name="llm_generate",
+            name="langchain_generate",
             data={
+                "provider": "langchain_nvidia",
                 "model": ctx.model,
                 "temperature": temperature,
                 "max_tokens": max_tokens,
@@ -56,6 +57,14 @@ class LLMGenerateSkill:
             max_tokens=max_tokens,
             extra=extra,
         )
+
+
+class LLMGenerateSkill(LangChainGenerateSkill):
+    """
+    兼容旧调用名：llm_generate -> langchain_generate
+    """
+
+    name = "llm_generate"
 
 
 class ImageGenerateSkill:
@@ -86,4 +95,3 @@ class VideoGenerateSkill:
             "detail": "尚未接入生视频服务（已预留 skill）。",
             "style": style,
         }
-

@@ -33,8 +33,8 @@ async function onLogin() {
     <NCard class="card" size="large">
       <template #header>登录</template>
       <NForm @submit.prevent="onLogin">
-        <NFormItem label="邮箱">
-          <NInput v-model:value="email" placeholder="admin@example.com" />
+        <NFormItem label="账号">
+          <NInput v-model:value="email" placeholder="zhangchi" />
         </NFormItem>
         <NFormItem label="密码">
           <NInput v-model:value="password" type="password" placeholder="********" />
@@ -47,7 +47,7 @@ async function onLogin() {
       </NForm>
       <template #footer>
         <NText depth="3" style="font-size: 12px">
-          首次初始化请调用：POST /auth/bootstrap（仅允许在没有任何用户时执行）
+          默认内置管理员：zhangchi / zhangchi2026（仅当数据库没有任何用户时自动创建）
         </NText>
       </template>
     </NCard>
@@ -93,4 +93,3 @@ async function onLogin() {
   backdrop-filter: blur(10px);
 }
 </style>
-

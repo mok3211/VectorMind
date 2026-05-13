@@ -9,8 +9,12 @@ from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlmodel import SQLModel
 
+# 读取 .env（Pydantic Settings），避免 alembic 运行时未加载环境变量导致误连 postgres
+from server.config import settings
+
 # 导入 models，确保 SQLModel.metadata 包含所有表
 from server import models  # noqa: F401
+from server.marketing import models as marketing_models  # noqa: F401
 
 
 # this is the Alembic Config object, which provides access to the values within the .ini file in use.
@@ -24,7 +28,8 @@ target_metadata = SQLModel.metadata
 
 
 def get_database_url() -> str:
-    url = os.getenv("DATABASE_URL")
+    # 优先使用 settings（会读取项目根目录 .env）
+    url = getattr(settings, "database_url", None) or os.getenv("DATABASE_URL")
     if not url:
         # 兜底：取 alembic.ini 里的 sqlalchemy.url
         url = config.get_main_option("sqlalchemy.url")
@@ -74,4 +79,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     asyncio.run(run_migrations_online())
-
