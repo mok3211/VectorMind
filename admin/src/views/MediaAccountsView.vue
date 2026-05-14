@@ -80,69 +80,13 @@ const columns = [
     }
   },
   { title: '备注', key: 'notes' },
-  { title: '更新时间', key: 'updated_at', width: 220 },
-  {
-    title: '操作',
-    key: 'actions',
-    width: 220,
-    render(row: any) {
-      return h('div', { style: 'display:flex; gap:8px' }, [
-        h(
-          NButton,
-          {
-            size: 'small',
-            tertiary: true,
-            onClick: () => connectAccount(row.id)
-          },
-          { default: () => '扫码连接' }
-        ),
-        h(
-          NButton,
-          {
-            size: 'small',
-            type: 'primary',
-            tertiary: true,
-            onClick: () => quickPublish(row.id)
-          },
-          { default: () => '测试发布' }
-        )
-      ])
-    }
-  }
+  { title: '更新时间', key: 'updated_at', width: 220 }
 ]
 
 const platformOptions = [
   { label: '小红书 xhs', value: 'xhs' },
   { label: '抖音 douyin', value: 'douyin' }
 ]
-
-async function connectAccount(accountId: number) {
-  message.info('即将打开浏览器，请扫码登录')
-  const { data } = await api.post(`/api/media-publish/accounts/${accountId}/connect`, {
-    timeout_sec: 180,
-    headless: false
-  })
-  if (data.ok) {
-    message.success('连接成功')
-  } else {
-    message.warning(data.detail || '连接失败')
-  }
-  await reload()
-}
-
-async function quickPublish(accountId: number) {
-  const { data } = await api.post(`/api/media-publish/accounts/${accountId}/publish`, {
-    title: '自动发布测试',
-    text: '这是一条来自 VectorMind 的自动发布测试文案。',
-    tags: ['自动化', '测试'],
-    dry_run: true
-  })
-  if (data.ok) {
-    message.success(data.detail || '已打开发布页')
-  } else {
-    message.warning(data.detail || '发布失败')
-  }
-}
 </script>
 
 <template>

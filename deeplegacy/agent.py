@@ -15,8 +15,14 @@ AGENT_DIR = Path(__file__).resolve().parent
 class MorningHistoryAgent:
     name = "morning_history"
 
-    async def run(self, *, date: datetime.date | None = None) -> AgentResult:
-        model = settings.morning_history_model or settings.llm_model_default
+    async def run(
+        self,
+        *,
+        date: datetime.date | None = None,
+        llm_model: str | None = None,
+        llm_extra: dict | None = None,
+    ) -> AgentResult:
+        model = llm_model or settings.morning_history_model or settings.llm_model_default
         prompt_version = settings.morning_history_prompt_version
 
         d = date or datetime.date.today()
@@ -37,11 +43,12 @@ class MorningHistoryAgent:
             vars={"word_count": 520, "today": today},
         )
 
-        text = await skill_registry.get("langchain_generate").run(
+        text = await skill_registry.get("llm_generate").run(
             ctx,
             messages=prompt_pack.messages,
             temperature=0.6,
             max_tokens=1200,
+            extra=llm_extra,
         )
         return AgentResult(
             text=text,

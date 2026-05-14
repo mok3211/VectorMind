@@ -30,6 +30,7 @@ class AgentConfig:
     headless: bool
     slow_mo_ms: int
     concurrency: int
+    local_only: bool
 
 
 def load_config() -> AgentConfig:
@@ -39,8 +40,7 @@ def load_config() -> AgentConfig:
     headless = (_env("AGENT_HEADLESS", "false") or "false").lower() in {"1", "true", "yes"}
     slow_mo_ms = int(_env("AGENT_SLOW_MO_MS", "200") or "200")
     concurrency = int(_env("AGENT_CONCURRENCY", "1") or "1")
-    if not executor_token:
-        raise RuntimeError("缺少 AGENT_EXECUTOR_TOKEN（先在 Server 后台创建 executor 并复制 token）")
+    local_only = (_env("AGENT_LOCAL_ONLY", "false") or "false").lower() in {"1", "true", "yes"}
     return AgentConfig(
         server_base_url=server_base_url.rstrip("/"),
         executor_token=executor_token,
@@ -48,13 +48,20 @@ def load_config() -> AgentConfig:
         headless=headless,
         slow_mo_ms=slow_mo_ms,
         concurrency=max(1, concurrency),
+        local_only=local_only,
     )
 
 
-cfg = load_config()
 app = FastAPI(title="VectorMind Local Agent", version="0.1.0")
-queue = TaskQueue(concurrency=cfg.concurrency)
-queue.start()
+
+
+@app.on_event("startup")
+async def on_startup():
+    # 允许在未配置 token 的情况下启动（便于本机调试/先跑通 Playwright）
+    # 但若 local_only=false 且调用需要回传 server 的接口，会提示配置 token。
+    app.state.cfg = load_config()
+    app.state.queue = TaskQueue(concurrency=app.state.cfg.concurrency)
+    app.state.queue.start()
 
 
 @app.get("/health")
@@ -69,6 +76,8 @@ class ChromeCollectReq(BaseModel):
 
 @app.post("/api/chrome/collect")
 async def chrome_collect(req: ChromeCollectReq):
+    cfg: AgentConfig = app.state.cfg
+    queue: TaskQueue = app.state.queue
     url = (req.url or "").strip()
     if not url:
         raise HTTPException(status_code=400, detail="url 不能为空")
@@ -85,6 +94,13 @@ async def chrome_collect(req: ChromeCollectReq):
             headless=cfg.headless,
             slow_mo_ms=cfg.slow_mo_ms,
         )
+        if cfg.local_only:
+            # 仅本机采集，不回传 server（用于调试/不依赖 token）
+            return {"platform": platform, "local_only": True, "payload": payload}
+
+        if not cfg.executor_token:
+            raise RuntimeError("缺少 AGENT_EXECUTOR_TOKEN：请先在后台创建 executor 并设置环境变量后再回传入库")
+
         # 先上传 artifacts（截图/录像），再入库
         artifacts = payload.pop("artifacts", []) or []
         uploaded: list[dict] = []

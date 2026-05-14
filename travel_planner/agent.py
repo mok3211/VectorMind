@@ -21,8 +21,10 @@ class TravelPlannerAgent:
         days: int = 3,
         budget: str | None = None,
         preferences: str | None = None,
+        llm_model: str | None = None,
+        llm_extra: dict | None = None,
     ) -> AgentResult:
-        model = settings.travel_planner_model or settings.llm_model_default
+        model = llm_model or settings.travel_planner_model or settings.llm_model_default
         prompt_version = settings.travel_planner_prompt_version
         ctx = AgentContext(
             agent=self.name,
@@ -48,11 +50,12 @@ class TravelPlannerAgent:
             },
         )
 
-        text = await skill_registry.get("langchain_generate").run(
+        text = await skill_registry.get("llm_generate").run(
             ctx,
             messages=prompt_pack.messages,
             temperature=0.4,
             max_tokens=1200,
+            extra=llm_extra,
         )
         return AgentResult(
             text=text,

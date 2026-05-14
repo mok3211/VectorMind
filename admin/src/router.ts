@@ -9,6 +9,7 @@ import WorkflowsView from '@/views/WorkflowsView.vue'
 import PromptsView from '@/views/PromptsView.vue'
 import MarketingView from '@/views/marketing/MarketingView.vue'
 import RbacView from '@/views/RbacView.vue'
+import LlmSettingsView from '@/views/LlmSettingsView.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -22,6 +23,7 @@ export const router = createRouter({
         { path: 'agents', component: AgentsView },
         { path: 'workflows', component: WorkflowsView },
         { path: 'prompts', component: PromptsView },
+        { path: 'llm', component: LlmSettingsView },
         { path: 'marketing', component: MarketingView },
         { path: 'runs', component: RunsView },
         { path: 'media', component: MediaAccountsView },

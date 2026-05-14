@@ -14,8 +14,15 @@ AGENT_DIR = Path(__file__).resolve().parent
 class BookRecommendationAgent:
     name = "book_recommendation"
 
-    async def run(self, *, theme: str | None = None, level: str | None = None) -> AgentResult:
-        model = settings.book_recommendation_model or settings.llm_model_default
+    async def run(
+        self,
+        *,
+        theme: str | None = None,
+        level: str | None = None,
+        llm_model: str | None = None,
+        llm_extra: dict | None = None,
+    ) -> AgentResult:
+        model = llm_model or settings.book_recommendation_model or settings.llm_model_default
         prompt_version = settings.book_recommendation_prompt_version
         ctx = AgentContext(
             agent=self.name,
@@ -31,11 +38,12 @@ class BookRecommendationAgent:
             vars={"theme": theme, "level": level},
         )
 
-        text = await skill_registry.get("langchain_generate").run(
+        text = await skill_registry.get("llm_generate").run(
             ctx,
             messages=prompt_pack.messages,
             temperature=0.7,
             max_tokens=900,
+            extra=llm_extra,
         )
         return AgentResult(
             text=text,

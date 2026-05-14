@@ -32,6 +32,7 @@ DEFAULT_PERMISSIONS: list[tuple[str, str, str]] = [
     ("media.manage", "媒体账号管理", "media"),
     ("runs.view", "运行记录查看", "runs"),
     ("agents.view", "Agent 查看", "agents"),
+    ("agents.run", "Agent 运行", "agents"),
     ("workflows.view", "工作流查看", "workflows"),
     ("workflows.manage", "工作流管理", "workflows"),
     ("prompts.view", "Prompts 查看", "prompts"),
@@ -56,6 +57,7 @@ DEFAULT_ROLE_PERMISSIONS: dict[str, list[str]] = {
         "media.manage",
         "runs.view",
         "agents.view",
+        "agents.run",
         "workflows.view",
         "prompts.view",
     ],
@@ -64,6 +66,7 @@ DEFAULT_ROLE_PERMISSIONS: dict[str, list[str]] = {
         "media.view",
         "runs.view",
         "agents.view",
+        "agents.run",
         "workflows.view",
         "prompts.view",
     ],
@@ -201,4 +204,3 @@ def has_permissions(user_is_admin: bool, user_permissions: Iterable[str], requir
     if isinstance(required, str):
         return required in perms
     return all(r in perms for r in required)
-

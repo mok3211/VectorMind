@@ -154,3 +154,23 @@ class UserSubscription(SQLModel, table=True):
     end_at: datetime | None = Field(default=None, index=True)
     auto_renew: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class LLMProviderConfig(SQLModel, table=True):
+    __tablename__ = "llm_provider_configs"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(index=True)
+    provider: str = Field(index=True)  # nvidia_nim/openai/gemini/deepseek
+    api_key_enc: str
+    api_base: str | None = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class SystemSetting(SQLModel, table=True):
+    __tablename__ = "system_settings"
+
+    key: str = Field(primary_key=True)
+    value: str
+    updated_at: datetime = Field(default_factory=datetime.utcnow)

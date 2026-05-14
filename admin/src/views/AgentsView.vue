@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import {
   NButton,
   NCard,
@@ -11,7 +11,8 @@ import {
   NInputNumber,
   NSelect,
   NTag,
-  NText
+  NText,
+  useMessage
 } from 'naive-ui'
 import { api } from '@/lib/api'
 
@@ -21,6 +22,53 @@ const agent = ref<AgentKey>('morning_radio')
 const loading = ref(false)
 const output = ref('')
 const meta = ref<any>(null)
+const message = useMessage()
+
+type Provider = 'nvidia_nim' | 'openai' | 'gemini' | 'deepseek'
+const modelMode = ref<'default' | 'server' | 'local'>('default')
+const serverConfigs = ref<any[]>([])
+const serverConfigId = ref<number | null>(null)
+const localConfigId = ref<string | null>(null)
+const modelOverride = ref<string | null>(null)
+
+const localStorageKey = 'llm_local_configs_v1'
+const localConfigs = ref<any[]>([])
+
+function loadLocalConfigs() {
+  try {
+    const raw = localStorage.getItem(localStorageKey)
+    const data = raw ? JSON.parse(raw) : []
+    localConfigs.value = Array.isArray(data) ? data : []
+  } catch {
+    localConfigs.value = []
+  }
+}
+
+async function loadServerConfigs() {
+  try {
+    const { data } = await api.get('/api/llm/configs')
+    serverConfigs.value = data.items ?? []
+  } catch {
+    serverConfigs.value = []
+  }
+}
+
+async function loadDefault() {
+  try {
+    const { data } = await api.get('/api/llm/default')
+    const d = data.item ?? {}
+    serverConfigId.value = d.config_id ?? null
+    modelOverride.value = d.model ?? null
+  } catch {
+    // ignore
+  }
+}
+
+onMounted(async () => {
+  loadLocalConfigs()
+  await loadServerConfigs()
+  await loadDefault()
+})
 
 // inputs
 const topic = ref<string | null>(null)
@@ -40,6 +88,20 @@ const agentOptions = [
   { label: '旅游规划', value: 'travel_planner' },
   { label: '早安历史', value: 'morning_history' }
 ]
+
+const serverOptions = computed(() =>
+  serverConfigs.value.map((x: any) => ({
+    label: `${x.name} · ${x.provider}`,
+    value: x.id
+  }))
+)
+
+const localOptions = computed(() =>
+  localConfigs.value.map((x: any) => ({
+    label: `${x.name} · ${x.provider}`,
+    value: x.id
+  }))
+)
 
 const endpoint = computed(() => {
   switch (agent.value) {
@@ -67,14 +129,42 @@ const payload = computed(() => {
   }
 })
 
+const llm = computed(() => {
+  if (modelMode.value === 'default') {
+    return { mode: 'default', model: modelOverride.value || null }
+  }
+  if (modelMode.value === 'server') {
+    return {
+      mode: 'server',
+      config_id: serverConfigId.value,
+      model: modelOverride.value || null
+    }
+  }
+  const cfg = localConfigs.value.find((x: any) => x.id === localConfigId.value) ?? null
+  return {
+    mode: 'local',
+    provider: (cfg?.provider as Provider) ?? null,
+    api_key: cfg?.api_key ?? null,
+    api_base: cfg?.api_base ?? null,
+    model: modelOverride.value || null
+  }
+})
+
 async function run() {
   loading.value = true
-  output.value = ''
+  output.value = `准备调用：${endpoint.value}\n`
   meta.value = null
   try {
-    const { data } = await api.post(endpoint.value, payload.value)
+    // 便于定位：在浏览器控制台也打印一次
+    // eslint-disable-next-line no-console
+    console.log('[AgentsView] POST', endpoint.value, payload.value, llm.value)
+    const { data } = await api.post(endpoint.value, { ...payload.value, llm: llm.value }, { timeout: 300_000 })
     output.value = data.text
     meta.value = data.meta
+  } catch (e: any) {
+    const detail = e?.response?.data?.detail ?? e?.message ?? '生成失败'
+    message.error(String(detail))
+    output.value = `${output.value}\n调用失败：${String(detail)}`
   } finally {
     loading.value = false
   }
@@ -87,9 +177,38 @@ async function run() {
       <NCard class="panel" size="small">
         <template #header>运行 Agent</template>
 
-        <NForm>
+        <!-- 防止表单默认 submit 导致页面刷新、请求未发出 -->
+        <NForm @submit.prevent="run">
           <NFormItem label="选择 Agent">
             <NSelect v-model:value="agent" :options="agentOptions" />
+          </NFormItem>
+
+          <NFormItem label="模型/Key">
+            <div style="display:flex; flex-direction:column; gap:10px; width: 100%">
+              <div style="display:grid; grid-template-columns: 160px 1fr; gap: 10px; width: 100%">
+                <NSelect
+                  v-model:value="modelMode"
+                  :options="[
+                    { label: '使用默认', value: 'default' },
+                    { label: '服务器配置', value: 'server' },
+                    { label: '本地配置', value: 'local' }
+                  ]"
+                />
+                <template v-if="modelMode === 'server'">
+                  <NSelect v-model:value="serverConfigId" :options="serverOptions" placeholder="选择服务器配置" />
+                </template>
+                <template v-else-if="modelMode === 'local'">
+                  <NSelect v-model:value="localConfigId" :options="localOptions" placeholder="选择本地配置" />
+                </template>
+                <template v-else>
+                  <NInput value="全局默认（后端决定 provider/model）" disabled />
+                </template>
+              </div>
+              <NInput
+                v-model:value="modelOverride"
+                placeholder="model（可空）：NVIDIA 用 meta/llama-3.1-70b-instruct；OpenAI 用 openai/gpt-4o-mini；Gemini 用 gemini/gemini-1.5-flash；DeepSeek 用 deepseek/deepseek-chat"
+              />
+            </div>
           </NFormItem>
 
           <template v-if="agent === 'morning_radio'">
@@ -130,7 +249,7 @@ async function run() {
           </template>
 
           <div style="display:flex; justify-content:flex-end; margin-top: 10px">
-            <NButton type="primary" :loading="loading" @click="run">生成</NButton>
+            <NButton type="primary" :loading="loading" attr-type="button" @click="run">生成</NButton>
           </div>
         </NForm>
       </NCard>
@@ -172,4 +291,3 @@ async function run() {
   min-height: 360px;
 }
 </style>
-
