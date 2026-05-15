@@ -95,3 +95,24 @@ class InteractionSendCommentRequest(BaseModel):
     account_profile_id: int | None = None
     headless: bool | None = None
     slow_mo_ms: int | None = None
+
+
+class QrLoginStartRequest(BaseModel):
+    profile_id: int
+    timeout_sec: int = 300
+
+
+class VideoSearchRequest(BaseModel):
+    platform: str
+    keyword: str
+    page: int = 1
+    timeout_ms: int = 60_000
+    headless: bool | None = None
+
+
+class CreatorSearchRequest(BaseModel):
+    platform: str
+    keyword: str
+    page: int = 1
+    timeout_ms: int = 60_000
+    headless: bool | None = None

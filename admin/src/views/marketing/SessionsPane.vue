@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, onMounted, ref } from 'vue'
+import { computed, h, onMounted, reactive, ref } from 'vue'
 import {
   NButton,
   NCard,
@@ -8,18 +8,44 @@ import {
   NFormItem,
   NInput,
   NSelect,
+  NText,
   useMessage
 } from 'naive-ui'
 import { api } from '@/lib/api'
 
 const message = useMessage()
-const profiles = ref<any[]>([])
+const accounts = ref<any[]>([])
 const sessions = ref<any[]>([])
 const loading = ref(false)
 
-const profileId = ref<number | null>(null)
+const accountId = ref<number | null>(null)
 const userAgent = ref<string | null>(null)
 const sessionJson = ref<string>('{}')
+const qrRun = ref<any | null>(null)
+const qrPolling = ref(false)
+
+const status = ref<string | null>(null)
+
+const pagination = reactive({
+  page: 1,
+  pageSize: 20,
+  pageSizes: [20, 50, 100],
+  itemCount: 0,
+  showSizePicker: true,
+  onChange: (p: number) => {
+    pagination.page = p
+    reload()
+  },
+  onUpdatePageSize: (s: number) => {
+    pagination.pageSize = s
+    pagination.page = 1
+    reload()
+  }
+})
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
 
 function fillTemplateXhs() {
   sessionJson.value = JSON.stringify(
@@ -60,24 +86,34 @@ function fillTemplateDouyin() {
 async function reload() {
   loading.value = true
   try {
-    const [p, s] = await Promise.all([api.get('/api/marketing/profiles?limit=200'), api.get('/api/marketing/sessions?limit=200')])
-    profiles.value = p.data.items
+    const qs = new URLSearchParams()
+    qs.set('page', String(pagination.page))
+    qs.set('page_size', String(pagination.pageSize))
+    if (status.value) qs.set('status', status.value)
+    const [a, s] = await Promise.all([api.get('/api/media-accounts'), api.get(`/api/marketing/sessions?${qs.toString()}`)])
+    accounts.value = a.data.items
     sessions.value = s.data.items
-    if (!profileId.value && profiles.value.length) profileId.value = profiles.value[0].id
+    pagination.itemCount = s.data.total ?? s.data.items?.length ?? 0
+    if (!accountId.value && accounts.value.length) accountId.value = accounts.value[0].id
   } finally {
     loading.value = false
   }
 }
 
-const profileOptions = computed(() =>
-  profiles.value.map((p) => ({
-    label: `${p.id} · ${p.platform} · ${p.nickname ?? p.sec_uid ?? '-'}`,
-    value: p.id
+const accountOptions = computed(() =>
+  accounts.value.map((a) => ({
+    label: `${a.id} · ${a.platform} · ${a.nickname ?? '-'}`,
+    value: a.id
   }))
 )
 
 async function importOne() {
-  if (!profileId.value) return
+  const acc = accounts.value.find((x) => x.id === accountId.value)
+  const pid = acc?.profile_id
+  if (!pid) {
+    message.error('请先创建媒体账号，再扫码生成会话')
+    return
+  }
   let obj: any = {}
   try {
     obj = JSON.parse(sessionJson.value || '{}')
@@ -86,7 +122,7 @@ async function importOne() {
     return
   }
   await api.post('/api/marketing/sessions/import', {
-    profile_id: profileId.value,
+    profile_id: pid,
     user_agent: userAgent.value,
     session_data: obj
   })
@@ -96,8 +132,38 @@ async function importOne() {
 
 async function validateOne(id: number) {
   await api.post(`/api/marketing/sessions/${id}/validate`)
-  message.success('已校验（stub）')
+  message.success('已校验')
   await reload()
+}
+
+async function startQrLogin() {
+  const acc = accounts.value.find((x) => x.id === accountId.value)
+  const pid = acc?.profile_id
+  if (!pid) {
+    message.error('请先创建媒体账号')
+    return
+  }
+  qrPolling.value = true
+  qrRun.value = null
+  try {
+    const { data } = await api.post('/api/marketing/qr-login/start', { profile_id: pid, timeout_sec: 300 })
+    qrRun.value = data.run
+    message.info('已打开浏览器窗口，请在弹出的窗口里扫码登录')
+    while (true) {
+      const r = await api.get(`/api/marketing/qr-login/${qrRun.value.id}`)
+      qrRun.value = r.data.run
+      if (qrRun.value.status !== 'running') break
+      await sleep(2000)
+    }
+    if (qrRun.value.status === 'success') {
+      message.success('登录成功，已生成会话')
+    } else {
+      message.error(qrRun.value.error || '登录失败')
+    }
+    await reload()
+  } finally {
+    qrPolling.value = false
+  }
 }
 
 onMounted(reload)
@@ -111,6 +177,7 @@ const columns = [
     title: '操作',
     key: 'actions',
     width: 140,
+    fixed: 'right' as const,
     render(row: any) {
       return h(
         NButton,
@@ -126,8 +193,14 @@ const columns = [
   <NCard size="small" class="sub">
     <template #header>导入会话（cookies/ua/device/verify 等）</template>
     <NForm>
-      <NFormItem label="Profile">
-        <NSelect v-model:value="profileId" :options="profileOptions" />
+      <NFormItem label="账号">
+        <NSelect v-model:value="accountId" :options="accountOptions" />
+      </NFormItem>
+      <NFormItem label="本机扫码登录">
+        <div style="display:flex; align-items:center; gap:10px; width:100%">
+          <NButton type="primary" secondary :loading="qrPolling" @click="startQrLogin">打开浏览器扫码</NButton>
+          <NText v-if="qrRun" depth="3">状态：{{ qrRun.status }}{{ qrRun.session_id ? ` · session ${qrRun.session_id}` : '' }}</NText>
+        </div>
       </NFormItem>
       <NFormItem label="User-Agent">
         <NInput v-model:value="userAgent" placeholder="可选（建议填写）" />
@@ -148,7 +221,23 @@ const columns = [
 
   <NCard size="small" class="sub" style="margin-top: 12px">
     <template #header>会话列表</template>
-    <NDataTable :columns="columns" :data="sessions" :loading="loading" />
+    <div style="display:flex; gap:10px; align-items:center; margin-bottom: 10px">
+      <NSelect
+        v-model:value="status"
+        clearable
+        placeholder="状态"
+        style="width: 160px"
+        :options="[
+          { label: 'valid', value: 'valid' },
+          { label: 'expired', value: 'expired' },
+          { label: 'invalid', value: 'invalid' }
+        ]"
+      />
+      <div style="flex: 1" />
+      <NButton secondary :loading="loading" @click="reload">查询</NButton>
+    </div>
+
+    <NDataTable :columns="columns" :data="sessions" :loading="loading" :scroll-x="820" remote :pagination="pagination" />
   </NCard>
 </template>
 

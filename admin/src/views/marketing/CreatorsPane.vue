@@ -8,7 +8,6 @@ const items = ref<any[]>([])
 const loading = ref(false)
 
 const platform = ref<'xhs' | 'douyin'>('xhs')
-const profileType = ref<'owned' | 'competitor'>('owned')
 const secUid = ref<string | null>(null)
 const nickname = ref<string | null>(null)
 const userLink = ref<string | null>(null)
@@ -16,7 +15,7 @@ const userLink = ref<string | null>(null)
 async function reload() {
   loading.value = true
   try {
-    const { data } = await api.get('/api/marketing/profiles?limit=200')
+    const { data } = await api.get('/api/marketing/profiles?profile_type=competitor&limit=200')
     items.value = data.items
   } finally {
     loading.value = false
@@ -26,7 +25,7 @@ async function reload() {
 async function createOne() {
   await api.post('/api/marketing/profiles', {
     platform: platform.value,
-    profile_type: profileType.value,
+    profile_type: 'competitor',
     sec_uid: secUid.value,
     nickname: nickname.value,
     user_link: userLink.value
@@ -43,9 +42,8 @@ onMounted(reload)
 const columns = [
   { title: 'ID', key: 'id', width: 80 },
   { title: '平台', key: 'platform', width: 100 },
-  { title: '类型', key: 'profile_type', width: 120 },
-  { title: 'sec_uid', key: 'sec_uid', width: 220 },
-  { title: '昵称', key: 'nickname', minWidth: 240, ellipsis: { tooltip: true } },
+  { title: 'sec_uid', key: 'sec_uid', width: 240 },
+  { title: '昵称', key: 'nickname', minWidth: 220, ellipsis: { tooltip: true } },
   { title: '状态', key: 'status', width: 120 },
   { title: '风控', key: 'risk_status', width: 120 }
 ]
@@ -53,21 +51,15 @@ const columns = [
 
 <template>
   <NCard size="small" class="sub">
-    <template #header>新增账号/竞品</template>
+    <template #header>新增达人</template>
     <NForm>
       <div class="row">
         <NFormItem label="平台" style="flex: 1">
           <NSelect v-model:value="platform" :options="[{ label: '小红书', value: 'xhs' }, { label: '抖音', value: 'douyin' }]" />
         </NFormItem>
-        <NFormItem label="类型" style="flex: 1">
-          <NSelect
-            v-model:value="profileType"
-            :options="[{ label: '自有账号', value: 'owned' }, { label: '竞品/监控', value: 'competitor' }]"
-          />
-        </NFormItem>
       </div>
       <NFormItem label="sec_uid">
-        <NInput v-model:value="secUid" placeholder="可先为空，后续采集后补齐" />
+        <NInput v-model:value="secUid" placeholder="可选（有则更准）" />
       </NFormItem>
       <NFormItem label="昵称">
         <NInput v-model:value="nickname" placeholder="可选" />
@@ -83,8 +75,8 @@ const columns = [
   </NCard>
 
   <NCard size="small" class="sub" style="margin-top: 12px">
-    <template #header>账号列表</template>
-    <NDataTable :columns="columns" :data="items" :loading="loading" :scroll-x="1020" />
+    <template #header>达人列表</template>
+    <NDataTable :columns="columns" :data="items" :loading="loading" :scroll-x="980" />
   </NCard>
 </template>
 

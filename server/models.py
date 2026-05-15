@@ -105,6 +105,10 @@ class MediaAccount(SQLModel, table=True):
     status: str = Field(default="disconnected")  # disconnected / connected / expired
     notes: str | None = None
 
+    profile_id: int | None = Field(default=None, foreign_key="mkt_platform_profiles.id", index=True)
+    latest_session_id: int | None = Field(default=None, foreign_key="mkt_platform_sessions.id", index=True)
+    last_login_run_id: int | None = Field(default=None, foreign_key="mkt_login_runs.id", index=True)
+
     # 以 json 字符串存（后续可升级 JSONB）
     auth_json: str | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow)

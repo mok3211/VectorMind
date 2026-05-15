@@ -6,12 +6,15 @@ from typing import Any
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 
+from server.logging_utils import get_logger
 from server.marketing.models import (
     MktComment,
     MktContent,
     MktContentMetricSnapshot,
     MktTrackMedia,
 )
+
+logger = get_logger(__name__)
 
 
 async def ingest_marketing_payload(
@@ -31,6 +34,13 @@ async def ingest_marketing_payload(
 
     now = datetime.utcnow().replace(microsecond=0)
     platform = (platform or "").strip().lower()
+    logger.info(
+        "ingest payload start platform=%s contents=%s snapshots=%s comments=%s",
+        platform,
+        len(payload.get("contents", []) or []),
+        len(payload.get("content_snapshots", []) or []),
+        len(payload.get("comments", []) or []),
+    )
 
     content_id_by_platform_id: dict[str, int] = {}
 
@@ -42,15 +52,57 @@ async def ingest_marketing_payload(
         if not platform_content_id:
             continue
 
+        title = c.get("title")
+        description = c.get("description")
+        url = c.get("url")
+        source = c.get("source")
+        content_type = c.get("content_type") or "content"
+        xsec_token = c.get("xsec_token")
+        xsec_source = c.get("xsec_source")
+        model_type = c.get("model_type")
+        sec_uid = c.get("sec_uid")
+        nickname = c.get("nickname")
+        liked_count = c.get("liked_count")
+        comment_count = c.get("comment_count")
+        share_count = c.get("share_count")
+        collected_count = c.get("collected_count")
+        create_time = c.get("create_time")
+
         stmt = select(MktContent).where(
             (MktContent.platform == platform) & (MktContent.platform_content_id == platform_content_id)
         )
         existing = (await session.exec(stmt)).first()
         if existing:
-            existing.title = c.get("title") or existing.title
-            existing.description = c.get("description") or existing.description
-            existing.url = c.get("url") or existing.url
-            existing.source = c.get("source") or existing.source
+            if title is not None:
+                existing.title = title
+            if description is not None:
+                existing.description = description
+            if url is not None:
+                existing.url = url
+            if source is not None:
+                existing.source = source
+            if content_type:
+                existing.content_type = content_type
+            if xsec_token:
+                existing.xsec_token = xsec_token
+            if xsec_source:
+                existing.xsec_source = xsec_source
+            if model_type:
+                existing.model_type = model_type
+            if sec_uid:
+                existing.sec_uid = sec_uid
+            if nickname:
+                existing.nickname = nickname
+            if liked_count is not None:
+                existing.liked_count = liked_count
+            if comment_count is not None:
+                existing.comment_count = comment_count
+            if share_count is not None:
+                existing.share_count = share_count
+            if collected_count is not None:
+                existing.collected_count = collected_count
+            if create_time and not existing.create_time:
+                existing.create_time = create_time
             existing.updated_at = now
             session.add(existing)
             await session.flush()
@@ -60,11 +112,21 @@ async def ingest_marketing_payload(
                 platform=platform,
                 profile_id=None,
                 platform_content_id=platform_content_id,
-                content_type=c.get("content_type") or "content",
-                url=c.get("url"),
-                title=c.get("title"),
-                description=c.get("description"),
-                source=c.get("source"),
+                content_type=content_type,
+                url=url,
+                title=title,
+                description=description,
+                xsec_token=xsec_token,
+                xsec_source=xsec_source,
+                model_type=model_type,
+                sec_uid=sec_uid,
+                nickname=nickname,
+                liked_count=liked_count,
+                comment_count=comment_count,
+                share_count=share_count,
+                collected_count=collected_count,
+                create_time=create_time,
+                source=source,
                 raw=c,
                 created_at=now,
                 updated_at=now,
@@ -83,9 +145,9 @@ async def ingest_marketing_payload(
                 tm = MktTrackMedia(
                     platform=platform,
                     platform_content_id=platform_content_id,
-                    url=c.get("url"),
-                    title=c.get("title"),
-                    source=c.get("source"),
+                    url=url,
+                    title=title,
+                    source=source,
                     status=0,
                     created_at=now,
                     updated_at=now,
@@ -189,10 +251,16 @@ async def ingest_marketing_payload(
         comments_upserted += 1
 
     await session.commit()
+    logger.info(
+        "ingest payload done platform=%s contents=%s snapshots=%s comments=%s",
+        platform,
+        len(payload.get("contents", []) or []),
+        len(payload.get("content_snapshots", []) or []),
+        comments_upserted,
+    )
 
     return {
         "contents": len(payload.get("contents", []) or []),
         "content_snapshots": len(payload.get("content_snapshots", []) or []),
         "comments": comments_upserted,
     }
-

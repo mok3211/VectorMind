@@ -201,8 +201,12 @@ class XhsPlaywrightCrawler(BasePlaywrightCrawler):
             comments: list[dict[str, Any]] = []
             for t in targets[:20]:
                 if not t.url:
-                    # 要求提供 url（你在“监控池”里可以填）
-                    continue
+                    t = _Target(
+                        platform_content_id=t.platform_content_id,
+                        url=f"https://www.xiaohongshu.com/explore/{t.platform_content_id}",
+                        title=t.title,
+                        source=t.source,
+                    )
                 # 监听常见评论接口，便于 comment_sync 时提取
                 network = await _collect_network_json(
                     page,
@@ -308,7 +312,12 @@ class DouyinPlaywrightCrawler(BasePlaywrightCrawler):
             comments: list[dict[str, Any]] = []
             for t in targets[:20]:
                 if not t.url:
-                    continue
+                    t = _Target(
+                        platform_content_id=t.platform_content_id,
+                        url=f"https://www.douyin.com/video/{t.platform_content_id}",
+                        title=t.title,
+                        source=t.source,
+                    )
                 await page.goto(t.url, wait_until="domcontentloaded", timeout=60_000)
                 # 监听常见评论/详情接口（若能抓到 JSON 则更稳定）
                 if job_type == "comment_sync":

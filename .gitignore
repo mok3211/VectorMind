@@ -34,10 +34,14 @@ admin/dist/
 logs/
 *.log
 *.pid
+data/
 dev.db
 *.db
 *.sqlite
 *.sqlite3
+
+# Local reference projects / vendored research
+xiaots/
 
 # Local Agent artifacts / profiles
 .agent_profile/

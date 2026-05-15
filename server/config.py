@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from sqlalchemy.engine import URL
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,7 +12,11 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     # 数据库
-    database_url: str = "sqlite+aiosqlite:///./dev.db"
+    db_host: str = "localhost"
+    db_port: int = 5432
+    db_name: str = "postgres"
+    db_username: str = "postgres"
+    db_password: str = "postgres"
 
     # JWT
     jwt_secret: str = "please_change_me"
@@ -19,6 +24,11 @@ class Settings(BaseSettings):
 
     # CORS
     cors_origins: str = "http://127.0.0.1:5173"
+
+    # 日志
+    log_dir: str = "logs"
+    log_level: str = "INFO"
+    log_retention_days: int = 5
 
     # NVIDIA NIM API Key（LiteLLM: NVIDIA_NIM_API_KEY）
     nvidia_nim_api_key: str | None = None
@@ -45,6 +55,37 @@ class Settings(BaseSettings):
     bootstrap_admin_identifier: str = "zhangchi"
     bootstrap_admin_password: str = "zhangchi2026"
     bootstrap_admin_force_reset: bool = False
+
+    _database_url_override: str | None = None
+
+    @property
+    def database_url(self) -> str:
+        if self._database_url_override:
+            return self._database_url_override
+        return URL.create(
+            drivername="postgresql+asyncpg",
+            username=self.db_username,
+            password=self.db_password,
+            host=self.db_host,
+            port=self.db_port,
+            database=self.db_name,
+        ).render_as_string(hide_password=False)
+
+    @property
+    def database_url_sync(self) -> str:
+        if self._database_url_override:
+            return self._database_url_override.replace("+aiosqlite", "").replace("+asyncpg", "+psycopg")
+        return URL.create(
+            drivername="postgresql+psycopg",
+            username=self.db_username,
+            password=self.db_password,
+            host=self.db_host,
+            port=self.db_port,
+            database=self.db_name,
+        ).render_as_string(hide_password=False)
+
+    def set_database_url_override(self, url: str | None) -> None:
+        self._database_url_override = url
 
 
 settings = Settings()

@@ -115,14 +115,15 @@ const tmColumns = [
   { title: 'ID', key: 'id', width: 70 },
   { title: '平台', key: 'platform', width: 90 },
   { title: 'media_id', key: 'platform_content_id', width: 200 },
-  { title: '标题', key: 'title' },
-  { title: '来源', key: 'source', width: 160 },
+  { title: '标题', key: 'title', minWidth: 320, ellipsis: { tooltip: true } },
+  { title: '来源', key: 'source', width: 200, ellipsis: { tooltip: true } },
   { title: '评论维护', key: 'is_comment', width: 110 },
   { title: '状态', key: 'status', width: 90 },
   {
     title: '操作',
     key: 'actions',
     width: 220,
+    fixed: 'right' as const,
     render(row: any) {
       return h('div', { style: 'display:flex; gap:8px' }, [
         h(
@@ -144,13 +145,14 @@ const tcColumns = [
   { title: 'ID', key: 'id', width: 70 },
   { title: '平台', key: 'platform', width: 90 },
   { title: 'media_id', key: 'platform_content_id', width: 200 },
-  { title: '标题', key: 'title' },
-  { title: '用户昵称', key: 'user_nickname', width: 160 },
+  { title: '标题', key: 'title', minWidth: 320, ellipsis: { tooltip: true } },
+  { title: '用户昵称', key: 'user_nickname', width: 180, ellipsis: { tooltip: true } },
   { title: '状态', key: 'track_status', width: 90 },
   {
     title: '操作',
     key: 'actions',
     width: 120,
+    fixed: 'right' as const,
     render(row: any) {
       return h(
         NButton,
@@ -202,7 +204,7 @@ const tcColumns = [
 
       <NCard size="small" class="sub" style="margin-top: 12px">
         <template #header>内容监控列表</template>
-        <NDataTable :columns="tmColumns" :data="trackMedia" :loading="loading" />
+        <NDataTable :columns="tmColumns" :data="trackMedia" :loading="loading" :scroll-x="1200" />
       </NCard>
     </NTabPane>
 
@@ -241,7 +243,7 @@ const tcColumns = [
 
       <NCard size="small" class="sub" style="margin-top: 12px">
         <template #header>评论监控列表</template>
-        <NDataTable :columns="tcColumns" :data="trackComments" :loading="loading" />
+        <NDataTable :columns="tcColumns" :data="trackComments" :loading="loading" :scroll-x="1040" />
       </NCard>
     </NTabPane>
   </NTabs>

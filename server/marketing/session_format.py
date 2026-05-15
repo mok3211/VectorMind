@@ -53,6 +53,8 @@ def normalize_marketing_session_v1(
     if platform not in {"xhs", "douyin"}:
         raise SessionFormatError("platform 仅支持 xhs / douyin")
 
+    default_cookie_domain = ".xiaohongshu.com" if platform == "xhs" else ".douyin.com"
+
     auth = raw.get("auth") or {}
     cookies = auth.get("cookies")
     if not isinstance(cookies, list) or len(cookies) == 0:
@@ -71,9 +73,11 @@ def normalize_marketing_session_v1(
         out["value"] = value
         # domain/path/expires 可选，但建议提供以提升稳定性
         if not out.get("domain"):
-            warnings.append(f"cookie {name} 缺少 domain（建议补齐）")
+            out["domain"] = default_cookie_domain
+            warnings.append(f"cookie {name} 缺少 domain，已自动补齐为 {default_cookie_domain}")
         if not out.get("path"):
-            warnings.append(f"cookie {name} 缺少 path（建议补齐）")
+            out["path"] = "/"
+            warnings.append(f"cookie {name} 缺少 path，已自动补齐为 /")
         norm_cookies.append(out)
 
     client = raw.get("client") or {}
@@ -95,4 +99,3 @@ def normalize_marketing_session_v1(
     raw.setdefault("created_at", datetime.utcnow().isoformat() + "Z")
 
     return NormalizedSession(platform=platform, user_agent=user_agent, session_data=raw, warnings=warnings)
-

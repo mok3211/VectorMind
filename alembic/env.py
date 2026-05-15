@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from logging.config import fileConfig
 
 from alembic import context
@@ -28,13 +27,10 @@ target_metadata = SQLModel.metadata
 
 
 def get_database_url() -> str:
-    # 优先使用 settings（会读取项目根目录 .env）
-    url = getattr(settings, "database_url", None) or os.getenv("DATABASE_URL")
+    # 统一使用 settings 里根据 DB_HOST/DB_PORT/DB_NAME/DB_USERNAME/DB_PASSWORD 组装的连接串
+    url = getattr(settings, "database_url", None)
     if not url:
-        # 兜底：取 alembic.ini 里的 sqlalchemy.url
-        url = config.get_main_option("sqlalchemy.url")
-    if not url:
-        raise RuntimeError("DATABASE_URL 未设置，且 alembic.ini 未配置 sqlalchemy.url")
+        raise RuntimeError("数据库配置未设置，请检查 .env 中的 DB_HOST/DB_PORT/DB_NAME/DB_USERNAME/DB_PASSWORD")
     return url
 
 

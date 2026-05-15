@@ -4,9 +4,11 @@ import asyncio
 from datetime import datetime
 from typing import Any
 
+from sqlalchemy import desc
 from sqlmodel import select
-from server.db import AsyncSessionLocal
+from server import db
 from server.config import settings
+from server.logging_utils import get_logger
 from server.marketing.crawlers import get_crawler
 from server.marketing.ingest import ingest_marketing_payload
 from server.marketing.models import (
@@ -15,6 +17,8 @@ from server.marketing.models import (
     MktTrackComment,
     MktTrackMedia,
 )
+
+logger = get_logger(__name__)
 
 
 async def run_job_async(job_id: int, run_id: int) -> None:
@@ -25,13 +29,14 @@ async def run_job_async(job_id: int, run_id: int) -> None:
     - 更新 run 状态与 stats
     """
 
-    async with AsyncSessionLocal() as session:
+    async with db.AsyncSessionLocal() as session:
         job = await session.get(MktJob, job_id)
         run = await session.get(MktJobRun, run_id)
         if not job or not run:
             return
 
         try:
+            logger.info("job run start job_id=%s run_id=%s platform=%s type=%s", job_id, run_id, job.platform, job.job_type)
             # 为了让“完整流程可跑”，当 params 未指定目标时，自动从监控池取目标：
             params = dict(job.params or {})
             params.setdefault("headless", bool(getattr(settings, "marketing_playwright_headless", True)))
@@ -65,6 +70,7 @@ async def run_job_async(job_id: int, run_id: int) -> None:
                             {"platform_content_id": r[0], "url": r[1], "title": r[2], "source": r[3]} for r in rows
                         ]
                     params["platform_content_ids"] = ids
+                    logger.info("job run resolved targets platform=%s type=%s targets=%s", job.platform, job.job_type, len(ids or []))
 
             # 给 Playwright crawler 提供会话：取该平台最新一条 session（生产版会按账号池策略选择）
             if "session_data" not in params:
@@ -74,6 +80,7 @@ async def run_job_async(job_id: int, run_id: int) -> None:
                     select(MktPlatformSession.session_data)
                     .join(MktPlatformProfile, MktPlatformProfile.id == MktPlatformSession.profile_id)
                     .where(MktPlatformProfile.platform == job.platform)
+                    .where(MktPlatformProfile.profile_type == "owned")
                     .order_by(desc(MktPlatformSession.updated_at))
                     .limit(1)
                 )
@@ -84,6 +91,7 @@ async def run_job_async(job_id: int, run_id: int) -> None:
             crawler = get_crawler(job.platform)
             res = await crawler.run(job_type=job.job_type, params=params)
 
+            ingest_stats = None
             raw = res.raw or {}
             if isinstance(raw, dict) and (raw.get("contents") or raw.get("content_snapshots") or raw.get("comments")):
                 ingest_stats = await ingest_marketing_payload(
@@ -92,6 +100,7 @@ async def run_job_async(job_id: int, run_id: int) -> None:
                     payload=raw,
                     ensure_track_media=True,
                 )
+                logger.info("job run ingest stats job_id=%s run_id=%s stats=%s", job_id, run_id, ingest_stats)
 
             run.status = "success"
             run.finished_at = datetime.utcnow()
@@ -104,10 +113,12 @@ async def run_job_async(job_id: int, run_id: int) -> None:
                 "ingest": ingest_stats if isinstance(raw, dict) else None,
                 "raw": res.raw,
             }
+            logger.info("job run success job_id=%s run_id=%s", job_id, run_id)
         except Exception as e:
             run.status = "failed"
             run.finished_at = datetime.utcnow()
             run.error = str(e)
+            logger.exception("job run failed job_id=%s run_id=%s", job_id, run_id)
 
         session.add(run)
         await session.commit()

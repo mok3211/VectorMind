@@ -3,9 +3,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import JSON, Boolean, Column, DateTime, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
+
+JSONType = JSON().with_variant(JSONB, "postgresql")
 
 
 class MktPlatformProfile(SQLModel, table=True):
@@ -20,23 +22,46 @@ class MktPlatformProfile(SQLModel, table=True):
     platform: str = Field(index=True)  # xhs / douyin / ...
     profile_type: str = Field(default="owned", index=True)  # owned / competitor
 
+    task_id: str | None = Field(default=None, index=True, max_length=64)
+    from_source: int = Field(default=0, sa_column=Column("from", Integer, index=True, default=0))
+    source_flags: int = Field(default=0, index=True)
+    source_task_id: str | None = Field(default=None, index=True, max_length=64)
+    media_code: str | None = Field(default=None, index=True, max_length=32)
+
     # 平台侧用户标识（不同平台可能不同）
     platform_user_id: str | None = Field(default=None, index=True)
     sec_uid: str | None = Field(default=None, index=True)
+    uid: str | None = Field(default=None, max_length=255)
 
     user_link: str | None = Field(default=None, index=True)
+    short_user_id: str | None = Field(default=None, max_length=64)
+    user_unique_id: str | None = Field(default=None, max_length=64)
     nickname: str | None = None
     avatar_url: str | None = None
+    avatar: str | None = Field(default=None, max_length=255)
+    gender: int = Field(default=0)
     signature: str | None = Field(default=None, sa_column=Column(Text))
     location: str | None = None
+    follows: int = Field(default=0)
+    fans: int = Field(default=0)
+    interaction: int = Field(default=0)
+    videos_count: int = Field(default=0)
 
     verify_type: int | None = Field(default=0)
     verify_name: str | None = None
 
+    is_update: int = Field(default=0)
+    is_greet: int = Field(default=0)
+    greet_time: datetime | None = Field(default=None, sa_column=Column(DateTime))
+    source: str | None = Field(default=None, index=True, max_length=255)
+    source_media_id: str | None = Field(default=None, max_length=64)
+    raw_data: str | None = Field(default=None, sa_column=Column(Text))
+    deleted_at: datetime | None = Field(default=None, sa_column=Column(DateTime, index=True))
+
     status: str = Field(default="active", index=True)  # active/disabled
     risk_status: str = Field(default="normal", index=True)  # normal/captcha/blocked/limited/unknown
 
-    meta: dict | None = Field(default=None, sa_column=Column(JSONB))
+    meta: dict | None = Field(default=None, sa_column=Column(JSONType))
 
     created_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime, nullable=False))
     updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime, nullable=False))
@@ -58,7 +83,7 @@ class MktPlatformSession(SQLModel, table=True):
     expires_at: datetime | None = None
 
     user_agent: str | None = Field(default=None, sa_column=Column(Text))
-    session_data: dict | None = Field(default=None, sa_column=Column(JSONB))
+    session_data: dict | None = Field(default=None, sa_column=Column(JSONType))
 
     last_error: str | None = Field(default=None, sa_column=Column(Text))
 
@@ -78,16 +103,38 @@ class MktContent(SQLModel, table=True):
     platform: str = Field(index=True)
     profile_id: int | None = Field(default=None, sa_column=Column(Integer, ForeignKey("mkt_platform_profiles.id"), index=True))
     platform_content_id: str = Field(index=True)
+    task_id: str | None = Field(default=None, index=True, max_length=64)
+    source_task_id: str | None = Field(default=None, index=True, max_length=64)
+    media_code: str | None = Field(default=None, index=True, max_length=32)
+    media_id: str | None = Field(default=None, index=True, max_length=64)
+    type: int | None = Field(default=None, index=True)
 
     content_type: str = Field(default="content", index=True)  # note/video/...
     url: str | None = Field(default=None, sa_column=Column(String(512)))
     title: str | None = Field(default=None, sa_column=Column(String(1024)))
     description: str | None = Field(default=None, sa_column=Column(Text))
+    xsec_token: str | None = Field(default=None, sa_column=Column(String(512), index=True))
+    xsec_source: str | None = Field(default=None, sa_column=Column(String(32)))
+    model_type: str | None = Field(default=None, sa_column=Column(String(32)))
     published_at: datetime | None = Field(default=None, sa_column=Column(DateTime))
+    sec_uid: str | None = Field(default=None, index=True, max_length=64)
+    nickname: str | None = Field(default=None, max_length=255)
+    create_time: datetime | None = Field(default=None, sa_column=Column(DateTime, index=True))
+    liked_count: int | None = Field(default=0, index=True)
+    comment_count: int | None = Field(default=0, index=True)
+    share_count: int | None = Field(default=0, index=True)
+    collected_count: int | None = Field(default=0, index=True)
 
     source: str | None = Field(default=None, index=True)  # 来源关键词/榜单等
-    tags: list[str] | None = Field(default=None, sa_column=Column(JSONB))
-    raw: dict | None = Field(default=None, sa_column=Column(JSONB))
+    tags_ids: str | None = Field(default=None, sa_column=Column(Text))
+    tags: list[str] | None = Field(default=None, sa_column=Column(JSONType))
+    raw: dict | None = Field(default=None, sa_column=Column(JSONType))
+    raw_data: str | None = Field(default=None, sa_column=Column(Text))
+    is_exported: int = Field(default=0, index=True)
+    is_comment: bool = Field(default=False, sa_column=Column(Boolean, index=True, default=False))
+    send_status: int = Field(default=0, index=True)
+    send_reason: str | None = Field(default=None, sa_column=Column(Text))
+    deleted_at: datetime | None = Field(default=None, sa_column=Column(DateTime, index=True))
 
     created_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime, nullable=False))
     updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime, nullable=False))
@@ -114,7 +161,7 @@ class MktContentMetricSnapshot(SQLModel, table=True):
     collect_count: int | None = Field(default=None)
     share_count: int | None = Field(default=None)
 
-    metrics: dict | None = Field(default=None, sa_column=Column(JSONB))
+    metrics: dict | None = Field(default=None, sa_column=Column(JSONType))
 
     __table_args__ = (
         Index("ux_mkt_content_metric_snapshots", "content_id", "captured_at", unique=True),
@@ -137,7 +184,7 @@ class MktProfileMetricSnapshot(SQLModel, table=True):
     interaction: int | None = Field(default=None)
     contents_count: int | None = Field(default=None)
 
-    metrics: dict | None = Field(default=None, sa_column=Column(JSONB))
+    metrics: dict | None = Field(default=None, sa_column=Column(JSONType))
 
     __table_args__ = (
         Index("ux_mkt_profile_metric_snapshots", "profile_id", "captured_at", unique=True),
@@ -159,10 +206,10 @@ class MktComment(SQLModel, table=True):
     content: str | None = Field(default=None, sa_column=Column(Text))
     like_count: int | None = None
     sub_comment_count: int | None = None
-    pictures: list[str] | None = Field(default=None, sa_column=Column(JSONB))
+    pictures: list[str] | None = Field(default=None, sa_column=Column(JSONType))
     created_at_platform: datetime | None = Field(default=None, sa_column=Column(DateTime))
 
-    raw: dict | None = Field(default=None, sa_column=Column(JSONB))
+    raw: dict | None = Field(default=None, sa_column=Column(JSONType))
 
     created_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime, nullable=False))
     updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime, nullable=False))
@@ -188,7 +235,7 @@ class MktJob(SQLModel, table=True):
     profile_id: int | None = Field(default=None, sa_column=Column(Integer, ForeignKey("mkt_platform_profiles.id"), index=True))
     content_id: int | None = Field(default=None, sa_column=Column(Integer, ForeignKey("mkt_contents.id"), index=True))
 
-    params: dict | None = Field(default=None, sa_column=Column(JSONB))
+    params: dict | None = Field(default=None, sa_column=Column(JSONType))
     cron: str | None = None  # 仅存 cron 表达式（执行由调度器/外部触发）
     enabled: bool = Field(default=True, index=True)
 
@@ -209,7 +256,7 @@ class MktJobRun(SQLModel, table=True):
     finished_at: datetime | None = Field(default=None, sa_column=Column(DateTime, index=True))
 
     error: str | None = Field(default=None, sa_column=Column(Text))
-    stats: dict | None = Field(default=None, sa_column=Column(JSONB))
+    stats: dict | None = Field(default=None, sa_column=Column(JSONType))
 
 
 class MktTrackMedia(SQLModel, table=True):
@@ -224,19 +271,36 @@ class MktTrackMedia(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     platform: str = Field(index=True)
+    task_id: str | None = Field(default=None, index=True, max_length=64)
+    source_task_id: str | None = Field(default=None, index=True, max_length=64)
+    platform_name: str | None = Field(default=None, index=True, max_length=64)
+    keyword: str | None = Field(default=None, index=True, max_length=255)
+    need_comments: int = Field(default=0)
+    brand: str | None = Field(default=None, sa_column=Column(String(255)))
+    hashtag_name: str | None = Field(default=None, sa_column=Column(String(1024)))
+    tags_ids: str | None = Field(default=None, sa_column=Column(Text))
+    media_code: str | None = Field(default=None, index=True, max_length=32)
 
     # 对齐 noctua 的 media_id（平台内容id）；为了独立于 mkt_contents，也保留一份
     platform_content_id: str = Field(index=True)
     content_id: int | None = Field(default=None, sa_column=Column(Integer, ForeignKey("mkt_contents.id"), index=True))
+    media_id: str | None = Field(default=None, index=True, max_length=64)
+    type: int | None = Field(default=None, index=True)
 
     url: str | None = Field(default=None, sa_column=Column(String(512)))
     title: str | None = Field(default=None, sa_column=Column(String(1024)))
+    description: str | None = Field(default=None, sa_column=Column(Text))
     sec_uid: str | None = Field(default=None, index=True)  # 作者 sec_uid（如可得）
     nickname: str | None = None
 
     source: str | None = Field(default=None, index=True)  # 来源关键词/榜单/导入批次等
-    source_type: str = Field(default="external", index=True)  # external/internal
+    source_scope: str = Field(default="external", sa_column=Column("source_scope", String(16), index=True))  # external/internal
+    source_type: int = Field(default=2, sa_column=Column("source_type", Integer, index=True, default=2))
     create_user: str | None = Field(default=None, index=True)
+    input_payload: str | None = Field(default=None, sa_column=Column(Text))
+    payment_amount: float = Field(default=0.0, sa_column=Column(Float, default=0.0))
+    create_time: datetime | None = Field(default=None, sa_column=Column(DateTime))
+    update_time: datetime | None = Field(default=None, sa_column=Column(DateTime))
 
     # 评论维护开关（noctua: is_comment）
     is_comment: bool = Field(default=False, index=True)
@@ -253,7 +317,7 @@ class MktTrackMedia(SQLModel, table=True):
     collect_count: int | None = Field(default=None, index=True)
 
     # 额外字段（用于对齐 noctua 的 input_payload/payment_amount 等扩展）
-    meta: dict | None = Field(default=None, sa_column=Column(JSONB))
+    meta: dict | None = Field(default=None, sa_column=Column(JSONType))
 
     created_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime, nullable=False))
     updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime, nullable=False))
@@ -272,27 +336,36 @@ class MktTrackComment(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     platform: str = Field(index=True)
+    task_id: str | None = Field(default=None, index=True, max_length=64)
+    source_task_id: str | None = Field(default=None, index=True, max_length=64)
+    media_code: str | None = Field(default=None, index=True, max_length=32)
 
     platform_content_id: str = Field(index=True)  # media_id
     content_id: int | None = Field(default=None, sa_column=Column(Integer, ForeignKey("mkt_contents.id"), index=True))
     url: str | None = Field(default=None, sa_column=Column(String(512)))
+    media_id: str | None = Field(default=None, index=True, max_length=64)
+    type: int = Field(default=0, index=True)
     title: str | None = Field(default=None, sa_column=Column(String(1024)))
 
-    user_nickname: str | None = Field(default=None, index=True)
-    create_user: str | None = Field(default=None, index=True)
+    user_nickname: str | None = Field(default=None, sa_column=Column("user_nick_name", String(255), index=True))
+    create_user: str | None = Field(default=None, sa_column=Column("created_user", String(128), index=True))
+    create_time: datetime | None = Field(default=None, sa_column=Column(DateTime))
+    last_track_time: datetime | None = Field(default=None, sa_column=Column(DateTime))
+    liked_count: int | None = Field(default=0)
 
     track_status: int = Field(default=0, index=True)  # 0 pending 1 updated 2 failed
     last_track_at: datetime | None = Field(default=None, sa_column=Column(DateTime, index=True))
     last_error: str | None = Field(default=None, sa_column=Column(Text))
     is_deleted: bool = Field(default=False, index=True)
 
-    raw: dict | None = Field(default=None, sa_column=Column(JSONB))
+    raw: dict | None = Field(default=None, sa_column=Column(JSONType))
+    raw_data: str | None = Field(default=None, sa_column=Column(Text))
 
     created_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime, nullable=False))
     updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime, nullable=False))
 
     __table_args__ = (
-        Index("ix_mkt_track_comments_platform_content_id", "platform", "platform_content_id", unique=False),
+        Index("ix_mkt_track_comments_platform_platform_content_id", "platform", "platform_content_id", unique=False),
     )
 
 
@@ -338,11 +411,26 @@ class MktInteractionJob(SQLModel, table=True):
     account_profile_id: int | None = Field(default=None, sa_column=Column(Integer, ForeignKey("mkt_platform_profiles.id"), index=True))
 
     # 目标（可批量）
-    targets: list[dict] = Field(default_factory=list, sa_column=Column(JSONB))
-    payload: dict | None = Field(default=None, sa_column=Column(JSONB))  # 例如评论文本模板、topic 等
+    targets: list[dict] = Field(default_factory=list, sa_column=Column(JSONType))
+    payload: dict | None = Field(default=None, sa_column=Column(JSONType))  # 例如评论文本模板、topic 等
 
-    stats: dict | None = Field(default=None, sa_column=Column(JSONB))
+    stats: dict | None = Field(default=None, sa_column=Column(JSONType))
     error: str | None = Field(default=None, sa_column=Column(Text))
 
     created_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime, nullable=False, index=True))
     updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime, nullable=False))
+
+
+class MktLoginRun(SQLModel, table=True):
+    __tablename__ = "mkt_login_runs"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    profile_id: int = Field(sa_column=Column(Integer, ForeignKey("mkt_platform_profiles.id"), nullable=False, index=True))
+    session_id: int | None = Field(default=None, sa_column=Column(Integer, ForeignKey("mkt_platform_sessions.id"), index=True))
+
+    status: str = Field(default="running", index=True)  # running/success/failed/timeout
+    started_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime, nullable=False, index=True))
+    finished_at: datetime | None = Field(default=None, sa_column=Column(DateTime, index=True))
+
+    error: str | None = Field(default=None, sa_column=Column(Text))
+    meta: dict | None = Field(default=None, sa_column=Column(JSONType))

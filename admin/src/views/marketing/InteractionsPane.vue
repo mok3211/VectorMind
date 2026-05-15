@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { NButton, NCard, NDataTable, NSelect, useMessage } from 'naive-ui'
+import { onMounted, reactive, ref } from 'vue'
+import { NButton, NCard, NDataTable, NInput, NSelect, useMessage } from 'naive-ui'
 import { api } from '@/lib/api'
 
 useMessage()
@@ -10,17 +10,38 @@ const loading = ref(false)
 const platform = ref<string | null>(null)
 const eventType = ref<string | null>(null)
 const status = ref<string | null>(null) // 'true' | 'false'
+const keyword = ref<string | null>(null)
+
+const pagination = reactive({
+  page: 1,
+  pageSize: 20,
+  pageSizes: [20, 50, 100],
+  itemCount: 0,
+  showSizePicker: true,
+  onChange: (p: number) => {
+    pagination.page = p
+    reload()
+  },
+  onUpdatePageSize: (s: number) => {
+    pagination.pageSize = s
+    pagination.page = 1
+    reload()
+  }
+})
 
 async function reload() {
   loading.value = true
   try {
     const qs = new URLSearchParams()
-    qs.set('limit', '200')
+    qs.set('page', String(pagination.page))
+    qs.set('page_size', String(pagination.pageSize))
     if (platform.value) qs.set('platform', platform.value)
     if (eventType.value) qs.set('event_type', eventType.value)
     if (status.value) qs.set('status', status.value)
+    if (keyword.value?.trim()) qs.set('keyword', keyword.value.trim())
     const { data } = await api.get(`/api/marketing/interaction-records?${qs.toString()}`)
     items.value = data.items
+    pagination.itemCount = data.total ?? data.items?.length ?? 0
   } finally {
     loading.value = false
   }
@@ -34,7 +55,7 @@ const columns = [
   { title: '事件', key: 'event_type', width: 140 },
   { title: '目标', key: 'target', width: 220 },
   { title: '结果', key: 'status', width: 90 },
-  { title: '原因', key: 'reason' },
+  { title: '原因', key: 'reason', minWidth: 320, ellipsis: { tooltip: true } },
   { title: '时间', key: 'created_at', width: 220 }
 ]
 </script>
@@ -71,6 +92,7 @@ const columns = [
           { label: '失败', value: 'false' }
         ]"
       />
+      <NInput v-model:value="keyword" placeholder="关键词（target/原因）" style="width: 220px" />
       <div style="flex: 1" />
       <NButton secondary @click="reload">刷新</NButton>
     </div>
@@ -78,7 +100,7 @@ const columns = [
 
   <NCard size="small" class="sub" style="margin-top: 12px">
     <template #header>互动记录</template>
-    <NDataTable :columns="columns" :data="items" :loading="loading" />
+    <NDataTable :columns="columns" :data="items" :loading="loading" :scroll-x="1160" remote :pagination="pagination" />
   </NCard>
 </template>
 

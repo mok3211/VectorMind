@@ -1,5 +1,4 @@
 Alembic migrations live here.
 
-- env.py: loads DATABASE_URL and SQLModel.metadata
+- env.py: loads DB_HOST/DB_PORT/DB_NAME/DB_USERNAME/DB_PASSWORD and SQLModel.metadata
 - versions/: revision scripts
-

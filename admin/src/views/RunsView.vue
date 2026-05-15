@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { h, onMounted, ref } from 'vue'
-import { NButton, NCard, NDataTable, NModal, NTag, NText } from 'naive-ui'
+import { h, onMounted, reactive, ref } from 'vue'
+import { NButton, NCard, NDataTable, NInput, NModal, NTag, NText } from 'naive-ui'
 import { api } from '@/lib/api'
 
 const items = ref<any[]>([])
@@ -9,15 +9,41 @@ const loading = ref(false)
 const show = ref(false)
 const current = ref<any | null>(null)
 
-onMounted(async () => {
+const agent = ref<string | null>(null)
+
+const pagination = reactive({
+  page: 1,
+  pageSize: 20,
+  pageSizes: [20, 50, 100],
+  itemCount: 0,
+  showSizePicker: true,
+  onChange: (p: number) => {
+    pagination.page = p
+    reload()
+  },
+  onUpdatePageSize: (s: number) => {
+    pagination.pageSize = s
+    pagination.page = 1
+    reload()
+  }
+})
+
+async function reload() {
   loading.value = true
   try {
-    const { data } = await api.get('/api/runs?limit=50')
+    const qs = new URLSearchParams()
+    qs.set('page', String(pagination.page))
+    qs.set('page_size', String(pagination.pageSize))
+    if (agent.value?.trim()) qs.set('agent', agent.value.trim())
+    const { data } = await api.get(`/api/runs?${qs.toString()}`)
     items.value = data.items
+    pagination.itemCount = data.total ?? data.items?.length ?? 0
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(reload)
 
 async function openRun(id: number) {
   const { data } = await api.get(`/api/runs/${id}`)
@@ -44,13 +70,14 @@ const columns = [
       return row.agent ? h(NTag, { size: 'small' }, { default: () => row.agent }) : '-'
     }
   },
-  { title: 'Model', key: 'model', width: 180 },
+  { title: 'Model', key: 'model', width: 220, ellipsis: { tooltip: true } },
   { title: 'Prompt', key: 'prompt_version', width: 120 },
   { title: 'Time', key: 'created_at' },
   {
     title: '操作',
     key: 'actions',
     width: 120,
+    fixed: 'right' as const,
     render(row: any) {
       return h(
         NButton,
@@ -69,7 +96,13 @@ const columns = [
       这里显示最近 50 条生成记录（用于复盘与迭代 prompt）。
     </NText>
 
-    <NDataTable :columns="columns" :data="items" :loading="loading" />
+    <div style="display:flex; gap:10px; align-items:center; margin-bottom: 10px">
+      <NInput v-model:value="agent" placeholder="Agent 过滤（可选）" style="width: 260px" />
+      <div style="flex: 1" />
+      <NButton secondary :loading="loading" @click="reload">查询</NButton>
+    </div>
+
+    <NDataTable :columns="columns" :data="items" :loading="loading" :scroll-x="920" remote :pagination="pagination" />
   </NCard>
 
   <NModal v-model:show="show" preset="card" title="运行详情" class="modal">
